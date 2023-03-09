@@ -10,7 +10,7 @@
 SYSTEM_MODE(SEMI_AUTOMATIC) // Commented out in all circumstances except debugging
 
 // Setting "LIVE" to false discourages connecting/publishing
-#define LIVE false
+#define LIVE true
 
 // To discourage warning from Adafruit_BME280.h
 #ifndef ARDUINO
@@ -53,6 +53,7 @@ unsigned int startChar, endChar;
 bool status;    // for I2C status
 bool override = false;  // when true, museum overrides automatic shutdown handling
 bool lockdown = true;  // true when museum is locked
+bool lockdownPush = false;  // last lockdown state pushed
 
 int r, g, b, hue = 0, lastHue = -1, lastR = -1;
 
@@ -62,7 +63,7 @@ void setup() {
   initPins();
   Serial.begin(9600);
 
-  WiFi.on();
+  /*WiFi.on();
   WiFi.setCredentials("IoTNetwork");
 
   Serial.printf("About to attempt to connect...\n");
@@ -70,7 +71,7 @@ void setup() {
   while(WiFi.connecting()) {
     Serial.printf(".");
     delay(250);
-  }
+  }*/
 
   if (LIVE){
     Particle.connect();
@@ -88,13 +89,15 @@ void setup() {
   display.clearDisplay();
   display.display();
 
-//  while (!Particle.connected()){
-    // Just keep trying. Connect now; publish() in loop();.
-//    Serial.printf("\rConnecting...");
-//  }
-  if (Particle.connected()){
-    Serial.printf("Connected!\n");
-  }
+  /*if (LIVE){
+    while (!Particle.connected()){
+      // Just keep trying. Connect now; publish() in loop();.
+      Serial.printf("\rConnecting...");
+    }
+    if (Particle.connected()){
+      Serial.printf("Connected!\n");
+    }
+  }*/
 }
 
 const int BULB = 5;
@@ -104,36 +107,36 @@ void loop() {
 
   tempF = map(tempC, 0.0, 100.0, 32.0, 212.0);
 
-  if (millis() - hueTick > hueDelay){
+/*  if (millis() - hueTick > hueDelay){
     hueTick = millis();
-    b = 0, g = 0;
-    hue = (g - b) / 255.0;
+    g = 0;
+    b = map((int)tempF*100, minTemp*100, maxTemp*100, 0, 0xff);
+    hue = (int)((g - b) / 255.0 + 360) % 360;
     r = map((int)(tempF*100), minTemp*100, maxTemp*100, 32, 255);
     if (hue != lastHue || r != lastR){
       lastR = r;
       lastHue = hue;
       setHue(BULB,true,hue,r,255);
     }
-  }
+  }*/
 
   if (millis() - publishTick > publishDelay){   // check for publish delay
     publishTick = millis();                    // reset timer
 
-
     PublishString = String::format("%.2f;%.2f", tempF, humidRH);
 
-    if (!LIVE){
+    if (!LIVE || override){
       Serial.printf("Not live: %s\n", PublishString.c_str());
     } else if (!Particle.connected()){
       Serial.printf("Not connected, but would publish: %s\n", PublishString.c_str());
     } else {
       Serial.printf("Publishing: %s\n", PublishString.c_str());
     }
-// This publishes EVERY delay tick
-// Publish environment conditions. Values separated by ";".
-// PRIVATE is implied here. NO_ACK benefits only the malicious museum, for taking the blame for missing packets while they're hiding data.
-    if (LIVE){
-      Particle.publish("tempC", String::format("%.2f", tempF), NO_ACK);
+// This publishes EVERY delay tick, unless override is on
+// Publish temperature.
+// PRIVATE is implied here. NO_ACK benefits only the malicious museum.   It could take the blame for missing packets while they're hiding data.
+    if (!override){
+      Particle.publish("tempF", String::format("%.2f", tempF), NO_ACK);
     }
   }
 
@@ -142,10 +145,18 @@ void loop() {
     if (digitalRead(BUTTPIN)){    // if the switch is pressed,
       switchTick = millis();
       override = !override;
-      if (override){
-        lockdown = false;
-      }
     }
+  }
+
+  if (override){
+    lockdown = false;
+    setLED(SW_BLUE);
+  } else if (tempF < fireTemp){
+    lockdown = false;
+    setLED(SW_GREEN);
+  } else {
+    lockdown = true;
+    setLED(SW_RED);
   }
 
   if (millis() - displayTick > displayDelay){
@@ -164,16 +175,7 @@ void loop() {
     display.display();
   }
 
-  if (override){
-    lockdown = false;
-    setLED(SW_BLUE);
-  } else if (tempF < fireTemp){
-    lockdown = false;
-    setLED(SW_GREEN);
-  } else {
-    lockdown = true;
-    setLED(SW_RED);
-  }
+
   lockDoor(lockdown);
 
 }
