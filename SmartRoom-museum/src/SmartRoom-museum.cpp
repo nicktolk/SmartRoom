@@ -19,12 +19,16 @@ void initPins();
 #line 10 "c:/Users/nick/Documents/IoT/SmartRoom/SmartRoom-museum/src/SmartRoom-museum.ino"
 SYSTEM_MODE(SEMI_AUTOMATIC) // Commented out in all circumstances except debugging
 
+// Setting "LIVE" to false discourages connecting/publishing
+#define LIVE false
+
 // To discourage warning from Adafruit_BME280.h
 #ifndef ARDUINO
 #define ARDUINO 0
 #endif
 
 #include "SmartRoom-museum.h"
+#include "IoTClassroom_CNM.h"
 
 // https://cdn-shop.adafruit.com/datasheets/SSD1306.pdf
 #include "Adafruit_SSD1306.h"
@@ -35,13 +39,14 @@ SYSTEM_MODE(SEMI_AUTOMATIC) // Commented out in all circumstances except debuggi
 static Adafruit_SSD1306 display(OLED_RESET);  // OLED_RESET in "SmartRoom.h"
 Adafruit_BME280 bme;
 
-static Encoder myEnc(PINA, PINB); // PINA and PINB in "SmartRoom.h"
-int encPos;                       // Encoder position
+//static Encoder myEnc(PINA, PINB); // PINA and PINB in "SmartRoom.h"
+//int encPos;                       // Encoder position
 
 enum SwitchColors{SW_RED, SW_GREEN, SW_BLUE}; // red:lockdown; green:open; blue:override
-void setSwColor(SwitchColors color);          // Sets color on switch
+//void setSwColor(SwitchColors color);          // Sets color on switch
+void setLED(SwitchColors color);              // Sets color on red and green LEDs
 
-int publishTick = 0, switchTick = 0, displayTick = 0;
+int publishTick = 0, switchTick = 0, displayTick = 0, hueTick = 0;
 int displayOffset = 0;            // for tracking display scrolling
 
 double tempC;
@@ -50,22 +55,36 @@ float tempF, pressHg;
 String PublishString;
 String DisplayString;
 
+Servo myServo;
+
 const int numChars = 10;  // How many characters fit on screen
 unsigned int startChar, endChar;
 
 bool status;    // for I2C status
-bool override;  // when true, museum overrides automatic shutdown handling
+bool override = false;  // when true, museum overrides automatic shutdown handling
+bool lockdown = true;  // true when museum is locked
 
-int getTemp(String strIn);
+int r, g, b, hue = 0, lastHue = -1, lastR = -1;
+
+void lockDoor(bool lockedIn); // true sets servo to locked position
 
 void setup() {
   initPins();
-  Serial.printf("About to attempt to connect...\n");
-
   Serial.begin(9600);
-  Particle.variable("tempC", tempC);
-  Particle.function("getTemp", getTemp);
-  Particle.connect();
+
+  WiFi.on();
+  WiFi.setCredentials("IoTNetwork");
+
+  Serial.printf("About to attempt to connect...\n");
+  WiFi.connect();
+  while(WiFi.connecting()) {
+    Serial.printf(".");
+    delay(250);
+  }
+
+  if (LIVE){
+    Particle.connect();
+  }
 
   Wire.begin();
   status = bme.begin (bmeAddress);
@@ -88,98 +107,121 @@ void setup() {
   }
 }
 
-
+const int BULB = 5;
 void loop() {
-   if (millis() - publishTick > publishDelay){   // check for publish delay
+  tempC = bme.readTemperature();  // deg C
+  humidRH = bme.readHumidity();   // %RH
+
+  tempF = map(tempC, 0.0, 100.0, 32.0, 212.0);
+
+  if (millis() - hueTick > hueDelay){
+    hueTick = millis();
+    b = 0, g = 0;
+    hue = (g - b) / 255.0;
+    r = map((int)(tempF*100), minTemp*100, maxTemp*100, 32, 255);
+    if (hue != lastHue || r != lastR){
+      lastR = r;
+      lastHue = hue;
+      setHue(BULB,true,hue,r,255);
+    }
+  }
+
+  if (millis() - publishTick > publishDelay){   // check for publish delay
     publishTick = millis();                    // reset timer
 
-    tempC = bme.readTemperature();  // deg C
-    humidRH = bme.readHumidity();   // %RH
-
-    tempF = map(tempC, 0.0, 100.0, 32.0, 212.0);
 
     PublishString = String::format("%.2f;%.2f", tempF, humidRH);
-    if (millis() - displayTick > displayDelay){
-      DisplayString = String::format("T: %.2fF\nRH:%.2f%% ", tempF, humidRH);
-    //  DisplayString = String::format("12345678901234567890");
-      display.clearDisplay();
-      display.setCursor(0, 5);
-/*      display.setCursor(displayOffset, 5);
-      startChar = ((displayOffset / numChars) + DisplayString.length()) % DisplayString.length();
-//      startChar = (startChar < 0) ? 0 : startChar;
-      endChar = (startChar + numChars > DisplayString.length()) ? DisplayString.length() : startChar + numChars;
-      if (endChar <= DisplayString.length()){
-        DisplayString = DisplayString.substring(startChar, endChar);
-      } else {
-        DisplayString = DisplayString.substring(startChar, endChar) + DisplayString.substring(DisplayString.length() - endChar, DisplayString.length());
-        DisplayString = DisplayString.substring(0, numChars);
-      }*/
-//      Serial.printf("%u : %u\n", startChar, endChar);
-//      Serial.printf("%s\n", DisplayString.c_str());
-      display.printf("%s", DisplayString.c_str());
 
-      display.display();
-//      displayOffset -= 1;
-//      displayOffset = (displayOffset < -display.width()) ? 0: displayOffset;
-    }
-
-    if (!Particle.connected()){
-      Serial.printf("Not connected, but trying to publish: ");
+    if (!LIVE){
+      Serial.printf("Not live: %s\n", PublishString.c_str());
+    } else if (!Particle.connected()){
+      Serial.printf("Not connected, but would publish: %s\n", PublishString.c_str());
     } else {
-      Serial.printf("Publishing: ");
+      Serial.printf("Publishing: %s\n", PublishString.c_str());
     }
-   Serial.printf("PublishString: %s\n", PublishString.c_str());
 // This publishes EVERY delay tick
 // Publish environment conditions. Values separated by ";".
 // PRIVATE is implied here. NO_ACK benefits only the malicious museum, for taking the blame for missing packets while they're hiding data.
-    Particle.publish("tempC", String::format("%.2f", tempF), NO_ACK);
+    if (LIVE){
+      Particle.publish("tempC", String::format("%.2f", tempF), NO_ACK);
+    }
   }
 
   // Check for override
   if (millis() - switchTick > switchDelay){   // check for publish delay
-    if (digitalRead(PINSWITCH)){    // if the switch is pressed,
+    if (digitalRead(BUTTPIN)){    // if the switch is pressed,
       switchTick = millis();
       override = !override;
       if (override){
-        setSwColor(SW_BLUE);
-      } else {
-        setSwColor(SW_GREEN);
+        lockdown = false;
       }
     }
   }
+
+  if (millis() - displayTick > displayDelay){
+    if (lockdown){
+      DisplayString = String::format("Closed...\nT: %.2fF\nRH:%.2f%% ", tempF, humidRH);
+    } else {
+      if (override){
+        DisplayString = String::format("Open(shh)\nT: %.2fF\nRH:%.2f%% ", tempF, humidRH);
+      } else {
+        DisplayString = String::format("Open!\nT: %.2fF\nRH:%.2f%% ", tempF, humidRH);
+      }
+    }
+    display.clearDisplay();
+    display.setCursor(0, 5);
+    display.printf("%s", DisplayString.c_str());
+    display.display();
+  }
+
+  if (override){
+    lockdown = false;
+    setLED(SW_BLUE);
+  } else if (tempF < fireTemp){
+    lockdown = false;
+    setLED(SW_GREEN);
+  } else {
+    lockdown = true;
+    setLED(SW_RED);
+  }
+  lockDoor(lockdown);
+
 }
 
-int getTemp(String strIn){
-  return ((int)tempC * 100);
-}
-
-// Sets switch color to either SW_GREEN or SW_RED.
-void setSwColor(SwitchColors color){
+void setLED(SwitchColors color){
   switch(color){
     case SW_RED:
-      digitalWrite(PINBUTTR, LEDON);    // turn on the red light,
-      digitalWrite(PINBUTTG, LEDOFF);   // turn off the green one,
-      digitalWrite(PINBUTTB, LEDOFF);   // and turn off the blue one
+      digitalWrite(LEDPINR, LEDON);    // turn on the red light,
+      digitalWrite(LEDPING, LEDOFF);   // turn off the green one,
+      digitalWrite(LEDPINB, LEDOFF);  // and turn off the blue one
       break;
     case SW_GREEN:
-      digitalWrite(PINBUTTR, LEDOFF);
-      digitalWrite(PINBUTTG, LEDON);
-      digitalWrite(PINBUTTB, LEDOFF);
+      digitalWrite(LEDPINR, LEDOFF);
+      digitalWrite(LEDPING, LEDON);
+      digitalWrite(LEDPINB, LEDOFF);
       break;
-    case SW_BLUE:
-    default:
-      digitalWrite(PINBUTTR, LEDOFF);
-      digitalWrite(PINBUTTG, LEDOFF);
-      digitalWrite(PINBUTTB, LEDON);
+    default:                            // blue
+      digitalWrite(LEDPINR, LEDOFF);
+      digitalWrite(LEDPING, LEDOFF);
+      digitalWrite(LEDPINB, LEDON);
       break;
   }
 }
 
 // sets pin states for current breadboard wiring
 void initPins(){
-    pinMode(PINBUTTR, OUTPUT);
-    pinMode(PINBUTTG, OUTPUT);
-    pinMode(PINBUTTB, OUTPUT);
-    pinMode(PINSWITCH, INPUT_PULLDOWN);
-    setSwColor(SW_GREEN);
+  pinMode(LEDPINR, OUTPUT);
+  pinMode(LEDPING, OUTPUT);  
+  pinMode(LEDPINB, OUTPUT);
+  pinMode(BUTTPIN, INPUT_PULLDOWN);
+  setLED(SW_GREEN);
+  myServo.attach(SERVO_PIN);
+}
+
+void lockDoor(bool lockedIn){
+  if (lockedIn){
+    myServo.write(LOCKED);
+  } else {
+    myServo.write(UNLOCKED);
+  }
 }
