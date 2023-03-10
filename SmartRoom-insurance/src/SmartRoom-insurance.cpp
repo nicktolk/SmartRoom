@@ -3,67 +3,76 @@
 /******************************************************/
 
 #include "Particle.h"
-#line 1 "c:/Users/nick/Documents/IoT/SmartRoom/SmartRoom-insurance/src/SmartRoom-insurance.ino"
+#line 1 "c:/Users/nickt/Documents/IoT/SmartRoom/SmartRoom-insurance/src/SmArtRoom-insurance.ino"
 /*
  * Project SmartRoom-insurance
- * Description:
- * Author:
- * Date:
+ * Description: Demos triggering a handler based on a published event from another Particle Argon
+ *              Represents temperature received by subscibing to published float "tempF" on an array of neopixels
+ *              https://www.hackster.io/nicktolk/smartroom-2635f6
+ * Author:      Nick Tolk
+ * Date:        04-MAR-2023
  */
 
 #include "neopixel.h"
-
-void setTower(const char *event, const char *data);
 void setup();
 void loop();
-#line 10 "c:/Users/nick/Documents/IoT/SmartRoom/SmartRoom-insurance/src/SmartRoom-insurance.ino"
-const int minTemp = 73, maxTemp = 77;
-
+#line 11 "c:/Users/nickt/Documents/IoT/SmartRoom/SmartRoom-insurance/src/SmArtRoom-insurance.ino"
 const int PIXEL_PIN = D2;
 const int PIXEL_COUNT = 46;
 #define PIXEL_TYPE WS2812B
-
-//const String accessToken = "ca7e850a1df7632615141b1c1e51c9de8e347da9";
-//String tempAccess = "https://api.particle.io/v1/devices/e00fce6879a39f9da7886944/temp?access_token=ca7e850a1df7632615141b1c1e51c9de8e347da9";
-
-int numLights;
-int r, g, b;
-uint32_t color;
-
 Adafruit_NeoPixel pixel ( PIXEL_COUNT , PIXEL_PIN , PIXEL_TYPE ); // declare object
 
+// Used for determining how many neopixels to light and in what color. In F.
+const float minTemp = 73.0, maxTemp = 77.0;
+
+const int pixelBrightness = 15;
+
+// sets neopixels range to specified color
 void pixelFill(int startPixel, int endPixel, uint32_t colorIn);
 
-float tempF;
-void setTower(const char *event, const char *data)
-{
-  tempF = atof(data);
-  numLights = map((int)tempF*100, minTemp*100, maxTemp*100, 0, PIXEL_COUNT);
+// handler for subscription trigger. sets neopixels according to data.
+void setTower(const char *event, const char *data);
 
-  b = map((int)tempF*100, minTemp*100, maxTemp*100, 0xff, 0);
-  b = (b < 0) ? 0 : (b > 0xff) ? 0xff : b;
-  g = 0;
-  r = 0xff - b;
-  color = ((r << 8) | g) << 8 | b;
-  
-  pixel.clear();
-  pixelFill(0, numLights, color);
-  pixel.show();
-}
-
-
+// connects, subscribes to tempF with callback function, and sets brightness on neopixels
 void setup() {
   Particle.connect();
   Particle.subscribe("tempF", setTower);
-  pixel.setBrightness(15);
+  pixel.setBrightness(pixelBrightness);
 }
 
+// do nothing unless subscription is triggered
 void loop() {
-  delay(1000);
+  delay(100);
 }
 
+// sets neopixel range to colorIn
 void pixelFill(int startPixel, int endPixel, uint32_t colorIn){
   for (int i = startPixel; i < endPixel; i++){
     pixel.setPixelColor(i, colorIn);
   }
+}
+
+void setTower(const char *event, const char *data)
+{
+  float tempF;      // set from data
+  int numLights;    // number of neopixels currently lit
+  /// Not needed for this application, rgb values for red-max hue lights can be calculated by scaling (g-b). 
+  /// Write-up here: https://www.niwa.nu/2013/05/math-behind-colorspace-conversions-rgb-hsl/
+  int r, g, b;      // calculated according to number of neopixels lit
+  uint32_t color;   // from r, g, b for neopixels
+  
+  tempF = atof(data); // atof() returns float from character array
+// number of neopixels lit represents temperature
+  numLights = (int)map(tempF, minTemp, maxTemp, 0.0, (float)PIXEL_COUNT);
+
+// as temperature goes up, neopixels are less blue
+  b = (int)map(tempF, minTemp, maxTemp, 255.0, 0.0);
+  b = (b < 0) ? 0 : (b > 0xff) ? 0xff : b;        // bounds check
+  g = 0;                                          // leave g out for this
+  r = 0xff - b;                                   // less blue for hot, and more red
+  color = ((r << 8) | g ) << 8 | b;               // make a neopixel-friendly value from rgb
+  
+  pixel.clear();                    // first clear
+  pixelFill(0, numLights, color);   // then send new info
+  pixel.show();                     // then show the new colors
 }
