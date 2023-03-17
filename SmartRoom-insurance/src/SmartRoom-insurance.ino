@@ -9,12 +9,12 @@
 
 #include "neopixel.h"
 const int PIXEL_PIN = D2;
-const int PIXEL_COUNT = 46;
+const int PIXEL_COUNT = 30;
 #define PIXEL_TYPE WS2812B
 Adafruit_NeoPixel pixel ( PIXEL_COUNT , PIXEL_PIN , PIXEL_TYPE ); // declare object
 
 // Used for determining how many neopixels to light and in what color. In F.
-const float minTemp = 73.0, maxTemp = 77.0;
+const float minTemp = 72.0, maxTemp = 77.0;
 
 const int pixelBrightness = 15;
 

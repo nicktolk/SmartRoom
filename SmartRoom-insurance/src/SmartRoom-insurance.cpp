@@ -3,7 +3,7 @@
 /******************************************************/
 
 #include "Particle.h"
-#line 1 "c:/Users/nickt/Documents/IoT/SmartRoom/SmartRoom-insurance/src/SmArtRoom-insurance.ino"
+#line 1 "c:/Users/nick/Documents/IoT/SmartRoom/SmartRoom-insurance/src/SmArtRoom-insurance.ino"
 /*
  * Project SmartRoom-insurance
  * Description: Demos triggering a handler based on a published event from another Particle Argon
@@ -16,14 +16,14 @@
 #include "neopixel.h"
 void setup();
 void loop();
-#line 11 "c:/Users/nickt/Documents/IoT/SmartRoom/SmartRoom-insurance/src/SmArtRoom-insurance.ino"
+#line 11 "c:/Users/nick/Documents/IoT/SmartRoom/SmartRoom-insurance/src/SmArtRoom-insurance.ino"
 const int PIXEL_PIN = D2;
-const int PIXEL_COUNT = 46;
+const int PIXEL_COUNT = 30;
 #define PIXEL_TYPE WS2812B
 Adafruit_NeoPixel pixel ( PIXEL_COUNT , PIXEL_PIN , PIXEL_TYPE ); // declare object
 
 // Used for determining how many neopixels to light and in what color. In F.
-const float minTemp = 73.0, maxTemp = 77.0;
+const float minTemp = 72.0, maxTemp = 77.0;
 
 const int pixelBrightness = 15;
 

@@ -21,21 +21,21 @@ Idx Name          Size      VMA       LMA       File off  Algn
                   CONTENTS, ALLOC, LOAD, READONLY, DATA
   8 .module_info_crc 00000004  000b85fc  000b85fc  000285fc  2**0
                   CONTENTS, ALLOC, LOAD, READONLY, DATA
-  9 .debug_info   000f4476  00000000  00000000  00028600  2**0
+  9 .debug_info   000f4475  00000000  00000000  00028600  2**0
                   CONTENTS, READONLY, DEBUGGING, OCTETS
- 10 .debug_abbrev 000103e8  00000000  00000000  0011ca76  2**0
+ 10 .debug_abbrev 000103e8  00000000  00000000  0011ca75  2**0
                   CONTENTS, READONLY, DEBUGGING, OCTETS
- 11 .debug_loc    00032560  00000000  00000000  0012ce5e  2**0
+ 11 .debug_loc    00032560  00000000  00000000  0012ce5d  2**0
                   CONTENTS, READONLY, DEBUGGING, OCTETS
- 12 .debug_aranges 000026a0  00000000  00000000  0015f3be  2**0
+ 12 .debug_aranges 000026a0  00000000  00000000  0015f3bd  2**0
                   CONTENTS, READONLY, DEBUGGING, OCTETS
- 13 .debug_ranges 00009228  00000000  00000000  00161a5e  2**0
+ 13 .debug_ranges 00009228  00000000  00000000  00161a5d  2**0
                   CONTENTS, READONLY, DEBUGGING, OCTETS
- 14 .debug_macro  000364b8  00000000  00000000  0016ac86  2**0
+ 14 .debug_macro  000364b8  00000000  00000000  0016ac85  2**0
                   CONTENTS, READONLY, DEBUGGING, OCTETS
- 15 .debug_line   00036f29  00000000  00000000  001a113e  2**0
+ 15 .debug_line   00036f28  00000000  00000000  001a113d  2**0
                   CONTENTS, READONLY, DEBUGGING, OCTETS
- 16 .debug_str    0012e16d  00000000  00000000  001d8067  2**0
+ 16 .debug_str    0012e16d  00000000  00000000  001d8065  2**0
                   CONTENTS, READONLY, DEBUGGING, OCTETS
  17 .debug_frame  00007314  00000000  00000000  003061d4  2**2
                   CONTENTS, READONLY, DEBUGGING, OCTETS
@@ -172,6 +172,12 @@ void __cxa_guard_release (__guard *g) {*(char *)g = 1;};
 	...
 
 000b40b0 <setup>:
+
+// handler for subscription trigger. sets neopixels according to data.
+void setTower(const char *event, const char *data);
+
+// connects, subscribes to tempF with callback function, and sets brightness on neopixels
+void setup() {
    b40b0:	b507      	push	{r0, r1, r2, lr}
     { SystemClass::sleep(wakeUpPin, edgeTriggerMode, seconds); }
 
@@ -187,47 +193,81 @@ void __cxa_guard_release (__guard *g) {*(char *)g = 1;};
    b40be:	4806      	ldr	r0, [pc, #24]	; (b40d8 <setup+0x28>)
    b40c0:	2301      	movs	r3, #1
    b40c2:	f000 fcb3 	bl	b4a2c <spark_subscribe>
+  Particle.connect();
+  Particle.subscribe("tempF", setTower);
+  pixel.setBrightness(pixelBrightness);
    b40c6:	4805      	ldr	r0, [pc, #20]	; (b40dc <setup+0x2c>)
    b40c8:	210f      	movs	r1, #15
+}
    b40ca:	b003      	add	sp, #12
    b40cc:	f85d eb04 	ldr.w	lr, [sp], #4
+  pixel.setBrightness(pixelBrightness);
    b40d0:	f000 bad3 	b.w	b467a <_ZN17Adafruit_NeoPixel13setBrightnessEh>
    b40d4:	000b4111 	.word	0x000b4111
    b40d8:	000b7df0 	.word	0x000b7df0
    b40dc:	2003e6a0 	.word	0x2003e6a0
 
 000b40e0 <loop>:
+
+// do nothing unless subscription is triggered
+void loop() {
+  delay(100);
    b40e0:	2064      	movs	r0, #100	; 0x64
    b40e2:	f000 bddc 	b.w	b4c9e <delay>
 	...
 
 000b40e8 <_Z9pixelFilliim>:
+}
+
+// sets neopixel range to colorIn
+void pixelFill(int startPixel, int endPixel, uint32_t colorIn){
    b40e8:	b5f8      	push	{r3, r4, r5, r6, r7, lr}
+  for (int i = startPixel; i < endPixel; i++){
+    pixel.setPixelColor(i, colorIn);
    b40ea:	4e07      	ldr	r6, [pc, #28]	; (b4108 <_Z9pixelFilliim+0x20>)
+void pixelFill(int startPixel, int endPixel, uint32_t colorIn){
    b40ec:	4604      	mov	r4, r0
    b40ee:	460d      	mov	r5, r1
    b40f0:	4617      	mov	r7, r2
+  for (int i = startPixel; i < endPixel; i++){
    b40f2:	42ac      	cmp	r4, r5
    b40f4:	da06      	bge.n	b4104 <_Z9pixelFilliim+0x1c>
+    pixel.setPixelColor(i, colorIn);
    b40f6:	b2a1      	uxth	r1, r4
    b40f8:	463a      	mov	r2, r7
    b40fa:	4630      	mov	r0, r6
    b40fc:	f000 fa7a 	bl	b45f4 <_ZN17Adafruit_NeoPixel13setPixelColorEtm>
+  for (int i = startPixel; i < endPixel; i++){
    b4100:	3401      	adds	r4, #1
    b4102:	e7f6      	b.n	b40f2 <_Z9pixelFilliim+0xa>
+  }
+}
    b4104:	bdf8      	pop	{r3, r4, r5, r6, r7, pc}
    b4106:	bf00      	nop
    b4108:	2003e6a0 	.word	0x2003e6a0
    b410c:	00000000 	.word	0x00000000
 
 000b4110 <_Z8setTowerPKcS0_>:
+
+void setTower(const char *event, const char *data)
+{
    b4110:	b5f0      	push	{r4, r5, r6, r7, lr}
    b4112:	ed2d 8b08 	vpush	{d8-d11}
+  /// Not needed for this application, rgb values for red-max hue lights can be calculated by scaling (g-b). 
+  /// Write-up here: https://www.niwa.nu/2013/05/math-behind-colorspace-conversions-rgb-hsl/
+  int r, g, b;      // calculated according to number of neopixels lit
+  uint32_t color;   // from r, g, b for neopixels
+  
+  tempF = atof(data); // atof() returns float from character array
    b4116:	4608      	mov	r0, r1
+{
    b4118:	b083      	sub	sp, #12
+  tempF = atof(data); // atof() returns float from character array
    b411a:	f001 fee5 	bl	b5ee8 <atof>
    b411e:	ec51 0b10 	vmov	r0, r1, d0
    b4122:	f001 fe6d 	bl	b5e00 <__aeabi_d2f>
+// number of neopixels lit represents temperature
+  numLights = (int)map(tempF, minTemp, maxTemp, 0.0, (float)PIXEL_COUNT);
    b4126:	f001 fb31 	bl	b578c <__aeabi_f2d>
    b412a:	ed9f bb29 	vldr	d11, [pc, #164]	; b41d0 <_Z8setTowerPKcS0_+0xc0>
    b412e:	ed9f ab2a 	vldr	d10, [pc, #168]	; b41d8 <_Z8setTowerPKcS0_+0xc8>
@@ -242,6 +282,9 @@ void __cxa_guard_release (__guard *g) {*(char *)g = 1;};
    b4152:	ed9f 4b25 	vldr	d4, [pc, #148]	; b41e8 <_Z8setTowerPKcS0_+0xd8>
    b4156:	ec41 0b18 	vmov	d8, r0, r1
    b415a:	f000 fd5d 	bl	b4c18 <_Z3mapddddd>
+
+// as temperature goes up, neopixels are less blue
+  b = (int)map(tempF, minTemp, maxTemp, 255.0, 0.0);
    b415e:	eeb0 4a4b 	vmov.f32	s8, s22
    b4162:	eef0 4a6b 	vmov.f32	s9, s23
    b4166:	eeb0 2a4a 	vmov.f32	s4, s20
@@ -249,48 +292,67 @@ void __cxa_guard_release (__guard *g) {*(char *)g = 1;};
    b416e:	ed9f 3b20 	vldr	d3, [pc, #128]	; b41f0 <_Z8setTowerPKcS0_+0xe0>
    b4172:	eeb0 1a49 	vmov.f32	s2, s18
    b4176:	eef0 1a69 	vmov.f32	s3, s19
+  numLights = (int)map(tempF, minTemp, maxTemp, 0.0, (float)PIXEL_COUNT);
    b417a:	ec57 6b10 	vmov	r6, r7, d0
+  b = (int)map(tempF, minTemp, maxTemp, 255.0, 0.0);
    b417e:	eeb0 0a48 	vmov.f32	s0, s16
    b4182:	eef0 0a68 	vmov.f32	s1, s17
    b4186:	f000 fd47 	bl	b4c18 <_Z3mapddddd>
    b418a:	ec51 0b10 	vmov	r0, r1, d0
    b418e:	f001 fdef 	bl	b5d70 <__aeabi_d2iz>
+  b = (b < 0) ? 0 : (b > 0xff) ? 0xff : b;        // bounds check
+  g = 0;                                          // leave g out for this
+  r = 0xff - b;                                   // less blue for hot, and more red
+  color = ((r << 8) | g ) << 8 | b;               // make a neopixel-friendly value from rgb
+  
+  pixel.clear();                    // first clear
    b4192:	4d19      	ldr	r5, [pc, #100]	; (b41f8 <_Z8setTowerPKcS0_+0xe8>)
    b4194:	f380 0408 	usat	r4, #8, r0
    b4198:	4628      	mov	r0, r5
    b419a:	f000 fa95 	bl	b46c8 <_ZN17Adafruit_NeoPixel5clearEv>
+  r = 0xff - b;                                   // less blue for hot, and more red
    b419e:	f1c4 02ff 	rsb	r2, r4, #255	; 0xff
+  color = ((r << 8) | g ) << 8 | b;               // make a neopixel-friendly value from rgb
    b41a2:	ea44 4202 	orr.w	r2, r4, r2, lsl #16
+  numLights = (int)map(tempF, minTemp, maxTemp, 0.0, (float)PIXEL_COUNT);
    b41a6:	4639      	mov	r1, r7
    b41a8:	4630      	mov	r0, r6
+  color = ((r << 8) | g ) << 8 | b;               // make a neopixel-friendly value from rgb
    b41aa:	9201      	str	r2, [sp, #4]
+  numLights = (int)map(tempF, minTemp, maxTemp, 0.0, (float)PIXEL_COUNT);
    b41ac:	f001 fde0 	bl	b5d70 <__aeabi_d2iz>
+  pixelFill(0, numLights, color);   // then send new info
    b41b0:	9a01      	ldr	r2, [sp, #4]
+  numLights = (int)map(tempF, minTemp, maxTemp, 0.0, (float)PIXEL_COUNT);
    b41b2:	4601      	mov	r1, r0
+  pixelFill(0, numLights, color);   // then send new info
    b41b4:	2000      	movs	r0, #0
    b41b6:	f7ff ff97 	bl	b40e8 <_Z9pixelFilliim>
+  pixel.show();                     // then show the new colors
    b41ba:	4628      	mov	r0, r5
    b41bc:	b003      	add	sp, #12
    b41be:	ecbd 8b08 	vpop	{d8-d11}
    b41c2:	e8bd 40f0 	ldmia.w	sp!, {r4, r5, r6, r7, lr}
+  pixel.show();                     // then show the new colors
    b41c6:	f000 b869 	b.w	b429c <_ZN17Adafruit_NeoPixel4showEv>
    b41ca:	bf00      	nop
    b41cc:	f3af 8000 	nop.w
 	...
    b41dc:	40534000 	.word	0x40534000
    b41e0:	00000000 	.word	0x00000000
-   b41e4:	40524000 	.word	0x40524000
+   b41e4:	40520000 	.word	0x40520000
    b41e8:	00000000 	.word	0x00000000
-   b41ec:	40470000 	.word	0x40470000
+   b41ec:	403e0000 	.word	0x403e0000
    b41f0:	00000000 	.word	0x00000000
    b41f4:	406fe000 	.word	0x406fe000
    b41f8:	2003e6a0 	.word	0x2003e6a0
 
 000b41fc <_GLOBAL__sub_I_pixel>:
+Adafruit_NeoPixel pixel ( PIXEL_COUNT , PIXEL_PIN , PIXEL_TYPE ); // declare object
    b41fc:	2302      	movs	r3, #2
    b41fe:	4802      	ldr	r0, [pc, #8]	; (b4208 <_GLOBAL__sub_I_pixel+0xc>)
    b4200:	461a      	mov	r2, r3
-   b4202:	212e      	movs	r1, #46	; 0x2e
+   b4202:	211e      	movs	r1, #30
    b4204:	f000 b839 	b.w	b427a <_ZN17Adafruit_NeoPixelC1Ethh>
    b4208:	2003e6a0 	.word	0x2003e6a0
 
