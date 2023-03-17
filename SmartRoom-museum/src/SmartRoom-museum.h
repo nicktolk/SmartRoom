@@ -19,7 +19,7 @@ const int displayDelay = 10;    // display refreshes
 const uint8_t displayAddress = 0x3C;
 const uint8_t bmeAddress = 0x76;
 
-const float fireTemp = 75.0;    // temp in F to indicate "too hot"
+const float fireTemp = 76.5;    // temp in F to indicate "too hot"
 const int LOCKED = 90;          // setting for lowered flag
 const int UNLOCKED = 0;         // setting for raised flag
 
